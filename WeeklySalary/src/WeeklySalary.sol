@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {console} from "forge-std/console.sol";
 
 // specification
 // - the contract is used to pay contractors weekly
@@ -20,7 +19,9 @@ import {console} from "forge-std/console.sol";
 contract WeeklySalary is Ownable2Step {
     using SafeERC20 for ERC20;
 
-    constructor(address tokenAddress) Ownable(msg.sender) {}
+    constructor(address tokenAddress) Ownable(msg.sender) {
+        token = ERC20(tokenAddress);
+    }
 
     struct Contractor {
         uint256 weeklySalary;
@@ -40,12 +41,35 @@ contract WeeklySalary is Ownable2Step {
     error InvalidWeeklySalary();
     error InsufficientBalance();
 
-    function createContractor(address _contractor, uint256 _weeklySalary) external onlyOwner {}
+    function createContractor(address _contractor, uint256 _weeklySalary) external onlyOwner {
+        require(_contractor != address(0), InvalidContractorAddress());
+        require(_weeklySalary != 0, InvalidWeeklySalary());
+        require(contractors[_contractor].weeklySalary == 0, ContractorAlreadyExists());
 
-    function deleteContractor(address _contractor) external onlyOwner {}
+        contractors[_contractor] = Contractor({weeklySalary: _weeklySalary, lastWithdrawal: block.timestamp});
+        emit ContractorCreated(_contractor, _weeklySalary);
+    }
+
+    function deleteContractor(address _contractor) external onlyOwner {
+        require(contractors[_contractor].weeklySalary != 0, InvalidContractorAddress());
+        delete contractors[_contractor];
+    }
 
     /*
      * @dev if the balance of the contract is not sufficient, the function will revert
      */
-    function withdraw() external {}
+    function withdraw() external {
+        require(contractors[msg.sender].weeklySalary != 0, InvalidContractorAddress());
+
+        Contractor storage c = contractors[msg.sender];
+        uint256 weeksCnt = (block.timestamp - c.lastWithdrawal) / 7 days;
+        uint256 totalSalary = weeksCnt * c.weeklySalary;
+
+        require(token.balanceOf(address(this)) >= totalSalary, InsufficientBalance());
+        token.safeTransfer(msg.sender, totalSalary);
+
+        c.lastWithdrawal = block.timestamp;
+
+        emit Withdrawal(msg.sender, totalSalary);
+    }
 }

@@ -2,14 +2,11 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 import {WeeklySalary} from "../src/WeeklySalary.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract RareSkillsToken is ERC20 {
-    constructor() ERC20("RareSkillsToken", "RST") {
-
-    }
+    constructor() ERC20("RareSkillsToken", "RST") {}
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
@@ -85,7 +82,7 @@ contract WeeklySalaryTest is Test {
         vm.expectRevert(abi.encodeWithSignature("InvalidContractorAddress()"));
         weeklySalary.deleteContractor(address(1337));
     }
-    
+
     function test_deleteContractor_notOwnerCannotDeleteContractor(address hacker) public {
         vm.assume(hacker != weeklySalary.owner());
         vm.prank(hacker);
@@ -158,5 +155,4 @@ contract WeeklySalaryTest is Test {
 
         assertEq(RareSkillsToken(address(rareSkillsToken)).balanceOf(contractor), 2 * amount);
     }
-    
 }
