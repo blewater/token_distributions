@@ -23,7 +23,12 @@ contract BasicBankERC20 {
      * @param token The address of the token to deposit
      * @param amount The amount of tokens to deposit
      */
-    function deposit(address token, uint256 amount) external {}
+    function deposit(address token, uint256 amount) external {
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        require(IERC20(token).balanceOf(address(this)) == amount, FeeOnTransferNotSupported());
+        userTokenBalance[msg.sender][token] += amount;
+        emit Deposit(msg.sender, token, amount);
+    }
 
     /*
      * @notice Withdraw any ERC20 token from the bank
@@ -31,5 +36,10 @@ contract BasicBankERC20 {
      * @param token The address of the token to withdraw
      * @param amount The amount of tokens to withdraw
      */
-    function withdraw(address token, uint256 amount) external {}
+    function withdraw(address token, uint256 amount) external {
+        require(userTokenBalance[msg.sender][token] >= amount, InsufficientBalance());
+        userTokenBalance[msg.sender][token] -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
+        emit Withdraw(msg.sender, token, amount);
+    }
 }
