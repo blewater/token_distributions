@@ -48,6 +48,8 @@ contract LinearVest {
         address indexed recipient, bytes32 indexed vestId, address token, uint256 amount, uint256 timestamp
     );
 
+    error AlreadyExists();
+
     /*
      * @notice Creates a vest
      * @param token The token to vest
@@ -64,7 +66,32 @@ contract LinearVest {
         uint40 startTime,
         uint40 duration,
         uint256 salt
-    ) external {}
+    ) external {
+        require(recipient != address(0), "recipient is 0");
+        require(amount != 0, "amount is 0");
+        require(address(token) != address(0), "token is 0");
+        require(startTime >= block.timestamp, "startTime in the past");
+        require(duration != 0, "duration is 0");
+        bytes32 id = computeVestId(token, recipient, amount, startTime, duration, salt);
+        require(vests[id].startTime == 0, AlreadyExists());
+
+        uint256 beforeBal = token.balanceOf(address(this));
+        token.safeTransferFrom(msg.sender, address(this), amount);
+
+        require(token.balanceOf(address(this)) - beforeBal == amount, "fees not allowed");
+
+        vestIds.push(id);
+        vests[id] = Vest({
+            token: address(token),
+            startTime: startTime,
+            recipient: recipient,
+            duration: duration,
+            amount: amount,
+            withdrawn: 0
+        });
+
+        emit VestCreated(msg.sender, recipient, address(token), amount, startTime, duration);
+    }
 
     /**
      * @notice Withdraws a vest
@@ -72,7 +99,21 @@ contract LinearVest {
      * @param amount The amount to withdraw. If amount is greater than the amount withdrawable,
      * the amount withdrawable is withdrawn.
      */
-    function withdrawVest(bytes32 vestId, uint256 amount) external {}
+    function withdrawVest(bytes32 vestId, uint256 amount) external {
+        Vest storage vest = vests[vestId];
+        require(vest.recipient == msg.sender, "not recipient");
+        require(block.timestamp >= vest.startTime, "not started yet");
+
+        uint256 diff = block.timestamp - vest.startTime;
+        uint256 vesting = vest.amount * diff / vest.duration;
+
+        uint256 withdrawal = vesting - vest.withdrawn;
+        withdrawal = withdrawal > amount ? amount : withdrawal;
+        IERC20(vest.token).safeTransfer(msg.sender, withdrawal);
+
+        vest.withdrawn += withdrawal;
+        emit VestWithdrawn(msg.sender, vestId, vest.token, withdrawal, block.timestamp);
+    }
 
     /*
      * @notice Computes the vest ID for a given vest
@@ -91,5 +132,7 @@ contract LinearVest {
         uint40 startTime,
         uint40 duration,
         uint256 salt
-    ) public pure returns (bytes32) {}
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(token, recipient, amount, startTime, duration, salt));
+    }
 }
