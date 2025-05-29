@@ -44,5 +44,8 @@ contract Pool is IPool {
 
     function deposit() external {
         // credit depositor with the amount that they sent to `balances`
+        uint256 depAmnt = token.balanceOf(address(this));
+        balances[msg.sender] += depAmnt;
+        emit Deposit(msg.sender, depAmnt);
     }
 }

@@ -18,6 +18,7 @@ contract UniswapV2StyleDepositTest is Test {
     Pool public pool;
     Depositor public depositor;
     RareSkillsToken public token;
+
     function setUp() public {
         token = new RareSkillsToken();
         pool = new Pool(address(token));
@@ -43,4 +44,3 @@ contract UniswapV2StyleDepositTest is Test {
         assertEq(pool.balances(address(this)), 0);
     }
 }
-    
