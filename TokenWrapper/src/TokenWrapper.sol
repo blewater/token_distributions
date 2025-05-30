@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -32,25 +33,53 @@ contract TokenWrapper is ERC20 {
     event Wrap(address indexed from, uint256 amount);
     event Unwrap(address indexed to, uint256 amount);
 
-    constructor(address _token) ERC20("", "") {}
+    constructor(address _token) ERC20("", "") {
+        token = IERC20Metadata(_token);
+        (bool ok, bytes memory data) = _token.staticcall(abi.encodeWithSignature("decimals()"));
+        decimalsInternal = ok ? abi.decode(data, (uint8)) : 0;
 
-    function decimals() public view override returns (uint8) {}
+        (ok, data) = _token.call(abi.encodeWithSignature("name()"));
+        nameInternal = ok ? abi.decode(data, (string)) : "";
 
-    function name() public view override returns (string memory) {}
+        (ok, data) = _token.staticcall(abi.encodeWithSignature("symbol()"));
+        symbolInternal = ok ? abi.decode(data, (string)) : "";
+    }
 
-    function symbol() public view override returns (string memory) {}
+    function decimals() public view override returns (uint8) {
+        return decimalsInternal;
+    }
+
+    function name() public view override returns (string memory) {
+        if (bytes(nameInternal).length == 0) {
+            return "Wrapped";
+        }
+
+        return string(abi.encodePacked("Wrapped ", nameInternal));
+    }
+
+    function symbol() public view override returns (string memory) {
+        return string(abi.encodePacked("w", symbolInternal));
+    }
 
     /**
      * @notice Wraps the amount of tokens from the caller's account to the contract
      * @notice The tokens of the underlying are transferred from the caller's account to the contract
      * @param amount The amount of tokens to wrap
      */
-    function wrap(uint256 amount) external {}
+    function wrap(uint256 amount) external {
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        _mint(msg.sender, amount);
+        emit Wrap(msg.sender, amount);
+    }
 
     /**
      * @notice Unwraps the amount of tokens from the caller's account. Transfers the tokens of the underlying to the caller's account.
      * @notice the wrapped tokens are burned from the caller's account.
      * @param amount The amount of tokens to unwrap
      */
-    function unwrap(uint256 amount) external {}
+    function unwrap(uint256 amount) external {
+        token.safeTransfer(msg.sender, amount);
+        _burn(msg.sender, amount);
+        emit Unwrap(msg.sender, amount);
+    }
 }

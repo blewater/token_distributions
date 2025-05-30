@@ -9,7 +9,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 contract RareSkillsToken is ERC20("RareSkills", "RS") {
     constructor() {
         _mint(msg.sender, 1e18);
-    } 
+    }
 
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
@@ -19,13 +19,13 @@ contract RareSkillsToken is ERC20("RareSkills", "RS") {
 contract RareSkillsToken2 is ERC20("RareSkills2", "RS2") {
     constructor() {
         _mint(msg.sender, 1e18);
-    } 
+    }
 }
 
 contract RareSkillsToken3 is ERC20("RareSkills3", "RS3") {
     constructor() {
         _mint(msg.sender, 1e18);
-    } 
+    }
 
     function decimals() public pure override returns (uint8) {
         return 6;
@@ -35,7 +35,7 @@ contract RareSkillsToken3 is ERC20("RareSkills3", "RS3") {
 contract RareSkillsToken4 is ERC20("RareSkills4", "RS4") {
     constructor() {
         _mint(msg.sender, 1e18);
-    } 
+    }
 
     function name() public pure override returns (string memory) {
         return "RareSkills4";
@@ -53,8 +53,8 @@ contract RareSkillsToken4 is ERC20("RareSkills4", "RS4") {
 contract RareSkillsToken5 is ERC20("RareSkills5", "RS5") {
     constructor() {
         _mint(msg.sender, 1e18);
-    } 
-    
+    }
+
     function name() public pure override returns (string memory) {
         revert();
     }
@@ -67,16 +67,14 @@ contract RareSkillsToken5 is ERC20("RareSkills5", "RS5") {
 contract RareSkillsToken6 is ERC20("RareSkills6", "RS6") {
     constructor() {
         _mint(msg.sender, 1e18);
-    } 
-    
+    }
+
     function decimals() public pure override returns (uint8) {
         revert();
     }
 }
 
-
 contract TokenWrapMetadataTest is Test {
-
     function test_Instantiation1() public {
         ERC20 token = new RareSkillsToken();
         // expect the arguments to be ignored if the functions are not missing
