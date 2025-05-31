@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
+
 // Oracle pool is owned by an exchange. They offer to buy and sell WETH for stablecoins
 // The price they buy and sell at is dynamically changed based on an onlyOwner function
 // Because the price can change at any time, the swap function needs to have some flexibility
@@ -19,6 +20,7 @@ contract OraclePool is Ownable2Step {
     IERC20 public immutable STABLECOIN; // NOTE: has 6 decimals
     uint256 immutable feeBasisPoints;
     uint256 public ethToUSDRate; // 8 decimals. 2000_00000000 -> 1 ETH is 2000 USD.
+    uint256 constant BASIS_POINTS = 10000;
 
     error InsufficientReserves();
     error Slippage(); // amountIn is not enough for amountOutMin
@@ -29,7 +31,12 @@ contract OraclePool is Ownable2Step {
 
     constructor(address _weth, address _stablecoin, uint256 _feeBasisPoints, uint256 _ethToUSDRate)
         Ownable(msg.sender)
-    {}
+    {
+        WETH = IERC20(_weth);
+        STABLECOIN = IERC20(_stablecoin);
+        feeBasisPoints = _feeBasisPoints;
+        ethToUSDRate = _ethToUSDRate;
+    }
 
     /*
      * @notice Buy WETH with stablecoin
@@ -40,7 +47,18 @@ contract OraclePool is Ownable2Step {
      * @revert cannot transfer stablecoin from user
      * @return amountOut The amount of WETH the user received.
      */
-    function buyWETH(uint256 amountStableIn, uint256 amountOutMin) external returns (uint256 amountOut) {}
+    function buyWETH(uint256 amountStableIn, uint256 amountOutMin) external returns (uint256 amountOut) {
+        STABLECOIN.safeTransferFrom(msg.sender, address(this), amountStableIn);
+        amountOut = amountStableIn * 1e20 /* 6 -> 18 = 12 + 8 (ethToUSDRate) = 20 */ / ethToUSDRate;
+        amountOut -= amountOut * feeBasisPoints / BASIS_POINTS;
+
+        require(amountOut >= amountOutMin, Slippage());
+        require(WETH.balanceOf(address(this)) >= amountOut, InsufficientReserves());
+
+        WETH.safeTransfer(msg.sender, amountOut);
+
+        emit SwapStableToWeth(msg.sender, amountStableIn, amountOut);
+    }
 
     /* 
      * @notice Sell WETH for stablecoin
@@ -51,7 +69,22 @@ contract OraclePool is Ownable2Step {
      * @revert cannot transfer WETH from user
      * @return amountOut The amount of stablecoin the user received.
      */
-    function sellWETH(uint256 amountWethIn, uint256 amountOutMin) external returns (uint256 amountOut) {}
+    function sellWETH(uint256 amountWethIn, uint256 amountOutMin) external returns (uint256 amountOut) {
+        WETH.safeTransferFrom(msg.sender, address(this), amountWethIn);
 
-    function setExchangeRate(uint256 _ethToUSDRate) external onlyOwner {}
+        // amountWethIn * (ethToUSDRate / 1e8) / 1e12;
+        amountOut = amountWethIn * ethToUSDRate / 1e20;
+        amountOut -= amountOut * 10 / BASIS_POINTS;
+
+        require(amountOut >= amountOutMin, Slippage());
+        require(WETH.balanceOf(address(this)) >= amountOut, InsufficientReserves());
+
+        WETH.transfer(msg.sender, amountOut);
+        emit SwapWethToStable(msg.sender, amountWethIn, amountOut);
+    }
+
+    function setExchangeRate(uint256 _ethToUSDRate) external onlyOwner {
+        emit ExchangeRateUpdated(ethToUSDRate, _ethToUSDRate);
+        ethToUSDRate = _ethToUSDRate;
+    }
 }

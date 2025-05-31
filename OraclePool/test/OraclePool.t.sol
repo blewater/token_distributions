@@ -6,9 +6,7 @@ import {OraclePool} from "../src/OraclePool.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract USD is ERC20("USD", "USD") {
-    constructor() {
-
-    }
+    constructor() {}
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
@@ -20,14 +18,12 @@ contract USD is ERC20("USD", "USD") {
 }
 
 contract WETH is ERC20("WETH", "WETH") {
-    constructor() {
+    constructor() {}
 
-    }
-    
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
-}   
+}
 
 contract OraclePoolTest is Test {
     OraclePool public oraclePool;
@@ -98,7 +94,7 @@ contract OraclePoolTest is Test {
 
         // eth price goes up slightly
         oraclePool.setExchangeRate(2002e8);
-        
+
         // alice's transaction should succeed
         vm.prank(alice);
         oraclePool.buyWETH(4000e6, 1.9 ether);
@@ -117,7 +113,7 @@ contract OraclePoolTest is Test {
 
         // eth price goes up slightly
         oraclePool.setExchangeRate(2200e8);
-        
+
         vm.prank(alice);
         vm.expectRevert(OraclePool.Slippage.selector);
         oraclePool.buyWETH(4000e6, 1.9 ether);
