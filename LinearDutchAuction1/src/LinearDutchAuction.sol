@@ -26,7 +26,19 @@ contract LinearDutchAuctionFactory {
         uint256 _duration,
         uint256 _amount,
         address _seller
-    ) external returns (address) {}
+    ) external returns (address) {
+        require(_startingPriceEther > 0, "invalid start price");
+        require(_startTime >= block.timestamp, "cannot start in the past");
+        require(_duration > 0, "invalid Duration");
+        require(uint160(address(_token)) != 0, "invalid token");
+        require(uint160(_seller) != 0, "invalid seller");
+
+        address au = address(new LinearDutchAuction(_token, _startingPriceEther, _startTime, _duration, _seller));
+        _token.safeTransferFrom(msg.sender, au, _amount);
+        emit AuctionCreated(au, address(_token), _startingPriceEther, _startTime, _duration, _amount, _seller);
+
+        return au;
+    }
 }
 
 // The auction is a contract that sells the token at a decreasing price until the duration is over.
@@ -43,6 +55,7 @@ contract LinearDutchAuction {
     uint256 public immutable startTime;
     uint256 public immutable durationSeconds;
     address public immutable seller;
+    uint256 public immutable delta;
 
     error AuctionNotStarted();
     error MsgValueInsufficient();
@@ -62,7 +75,15 @@ contract LinearDutchAuction {
         uint256 _startTime,
         uint256 _durationSeconds,
         address _seller
-    ) {}
+    ) {
+        token = _token;
+        startingPriceEther = _startingPriceEther;
+        startTime = _startTime;
+        durationSeconds = _durationSeconds;
+        seller = _seller;
+
+        delta = _startingPriceEther / _durationSeconds;
+    }
 
     /*
      * @notice Get the current price of the token
@@ -71,7 +92,16 @@ contract LinearDutchAuction {
      * @revert if someone already purchased the token
      * @return the current price of the token in Ether
      */
-    function currentPrice() public view returns (uint256) {}
+    function currentPrice() public view returns (uint256) {
+        uint256 delta = block.timestamp - startTime;
+        uint256 elapsed = durationSeconds;
+        if (durationSeconds >= delta) {
+            elapsed -= delta;
+        }
+        uint256 price = elapsed * startingPriceEther / durationSeconds;
+
+        return price;
+    }
 
     /*
      * @notice Buy tokens at the current price
@@ -81,5 +111,16 @@ contract LinearDutchAuction {
      * @revert if sending Ether to the seller fails
      * @dev Will try to refund the user if they send too much ether. If the refund reverts, the transaction still succeeds.
      */
-    receive() external payable {}
+    receive() external payable {
+        require(block.timestamp >= startTime, AuctionNotStarted());
+        uint256 price = currentPrice();
+        require(msg.value >= price, MsgValueInsufficient());
+        uint256 change = msg.value - price;
+        (bool ok,) = seller.call{value: price}("");
+        token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+        require(ok, SendEtherToSellerFailed());
+        if (change > 0) {
+            msg.sender.call{value: change}("");
+        }
+    }
 }
