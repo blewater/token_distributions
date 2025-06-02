@@ -185,6 +185,5 @@ contract CrowdfundingTest is Test {
         vm.expectEmit();
         emit Withdrawal(beneficiary, contractBalance);
         crowdfunding.withdraw();
-
     }
 }
